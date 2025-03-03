@@ -10,6 +10,9 @@ import (
 
 const configFileName = ".gatorconfig.json"
 
+// todo temporary
+const intermediatePath = "/home/michal/workspace/blog_aggregator_project/blog_aggregator"
+
 type Config struct {
 	DB_URL            string `json:"db_url"`
 	CURRENT_USER_NAME string `json:"current_user_name"`
@@ -45,20 +48,22 @@ func Read() (Config, error) {
 
 }
 
-func (c *Config) SetUser(username string) error{
+func (c *Config) SetUser(username string) error {
 	c.CURRENT_USER_NAME = username
 	return write(*c)
 
 }
 
 func getConfigFilePath() (string, error) {
-	basePath, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Println("Error reading config file:", err)
-		return "", err
-	}
+	// uncomment this on final
+	// basePath, err := os.UserHomeDir()
+	// if err != nil {
+	// 	fmt.Println("Error reading config file:", err)
+	// 	return "", err
+	// }
 
-	fullPath := filepath.Join(basePath, configFileName)
+	fullPath := filepath.Join(intermediatePath, configFileName)
+	fmt.Println(fullPath)
 	return fullPath, nil
 }
 
