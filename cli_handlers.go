@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
+	"html"
+	"io"
+	"net/http"
 	"time"
 
 	"github.com/MichalGul/blog_aggregator/internal/config"
@@ -119,4 +123,59 @@ func handleReset(s *state, cmd command) error {
 	fmt.Println("Database was cleaned from data")
 
 	return err
+}
+
+func handleAgg(s *state, cmd command) error {
+	var feedStr string = "https://www.wagslane.dev/index.xml"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	rssFeed, err := fetchFeed(ctx, feedStr)
+	if err != nil {
+		return fmt.Errorf("error fetching RSS feed at %s, err: %v", feedStr, err)
+	}
+
+	fmt.Printf("%+v\n", rssFeed)
+
+	return nil
+
+}
+
+func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
+
+	req, err := http.NewRequestWithContext(ctx, "GET", feedURL, nil)
+	if err != nil {
+		return &RSSFeed{}, fmt.Errorf("error creating request %v", err)
+	}
+	req.Header.Set("User-Agent", "gator")
+
+	httpClient := &http.Client{}
+
+	resp, resp_err := httpClient.Do(req)
+	if resp_err != nil {
+		return &RSSFeed{}, fmt.Errorf("error getting response %v", resp_err)
+	}
+	defer resp.Body.Close()
+
+	byteArray, read_err := io.ReadAll(resp.Body)
+	if read_err != nil {
+		return &RSSFeed{}, fmt.Errorf("error reading response %v", read_err)
+	}
+
+	rssFeed := RSSFeed{}
+	unmarshallErr := xml.Unmarshal(byteArray, &rssFeed)
+	if unmarshallErr != nil {
+		return &RSSFeed{}, fmt.Errorf("error unmarshalling response %v", unmarshallErr)
+
+	}
+
+	rssFeed.Channel.Title = html.UnescapeString(rssFeed.Channel.Title)
+	rssFeed.Channel.Description = html.UnescapeString(rssFeed.Channel.Description)
+
+	for i := range rssFeed.Channel.Item {
+		rssFeed.Channel.Item[i].Title = html.UnescapeString(rssFeed.Channel.Item[i].Title)
+		rssFeed.Channel.Item[i].Description = html.UnescapeString(rssFeed.Channel.Item[i].Description)
+	}
+
+	return &rssFeed, nil
 }
