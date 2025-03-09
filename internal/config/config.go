@@ -56,14 +56,17 @@ func (c *Config) SetUser(username string) error {
 
 func getConfigFilePath() (string, error) {
 	// uncomment this on final
-	// basePath, err := os.UserHomeDir()
-	// if err != nil {
-	// 	fmt.Println("Error reading config file:", err)
-	// 	return "", err
-	// }
+	basePath, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println("Error reading config file:", err)
+		return "", err
+	}
+	fullPath := filepath.Join(basePath, configFileName)
 
-	fullPath := filepath.Join(intermediatePath, configFileName)
+
+	// fullPath := filepath.Join(intermediatePath, configFileName)
 	fmt.Println(fullPath)
+	
 	return fullPath, nil
 }
 
