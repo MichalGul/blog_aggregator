@@ -14,5 +14,8 @@ SELECT users.id, users.created_at, users.updated_at, users.name from users where
 -- name: GetUsers :many
 SELECT * FROM users;
 
+-- name: GetUsernameById :one
+SELECT users.name from users where users.id=$1;
+
 -- name: DeleteUsers :exec
 DELETE from users;

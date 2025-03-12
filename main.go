@@ -30,11 +30,10 @@ func main() {
 	defer db.Close()
 
 	appState := state{
-		db: dbQueries,
+		db:     dbQueries,
 		config: &configData,
 	}
 
-	
 	cliCommands := commands{
 		handableCommands: map[string]func(*state, command) error{},
 	}
@@ -44,7 +43,8 @@ func main() {
 	cliCommands.register("reset", handleReset)
 	cliCommands.register("users", handlerUsers)
 	cliCommands.register("agg", handleAgg)
-
+	cliCommands.register("addfeed", handleAddFeed)
+	cliCommands.register("feeds", handleFeeds)
 
 	providedCommands := os.Args
 	if len(providedCommands) < 2 {
