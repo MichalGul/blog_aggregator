@@ -1,4 +1,5 @@
 package main
+
 import (
 	"context"
 	"fmt"
@@ -39,13 +40,9 @@ func printFeedDB(feed database.GetFeedsRow, s *state) {
 
 }
 
-func handleAddFeed(s *state, cmd command) error {
+func handleAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		return fmt.Errorf("addfeed command expects two arguments of feed name and url")
-	}
-	currentUser, userErr := s.db.GetUser(context.Background(), s.config.CURRENT_USER_NAME)
-	if userErr != nil {
-		return fmt.Errorf("error getting user from db to add feed with name %s: %v", cmd.args[0], userErr)
 	}
 
 	feedName := cmd.args[0]
@@ -57,7 +54,7 @@ func handleAddFeed(s *state, cmd command) error {
 		UpdatedAt: time.Now(),
 		Name:      feedName,
 		Url:       feedUrl,
-		UserID:    currentUser.ID,
+		UserID:    user.ID,
 	})
 	if create_error != nil {
 		return fmt.Errorf("error adding feed: %s to database: %v", feedName, create_error)
@@ -67,11 +64,11 @@ func handleAddFeed(s *state, cmd command) error {
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		UserID:    currentUser.ID,
+		UserID:    user.ID,
 		FeedID:    createdFeed.ID,
 	})
 	if errorFeedFollow != nil {
-		return fmt.Errorf("error adding feed follow for user %s to database %v", currentUser.Name, errorFeedFollow)
+		return fmt.Errorf("error adding feed follow for user %s to database %v", user.Name, errorFeedFollow)
 	}
 
 	fmt.Printf("Feed was successfuly created \n")

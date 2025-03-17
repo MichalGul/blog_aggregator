@@ -28,6 +28,19 @@ type commands struct {
 	handableCommands map[string]func(*state, command) error
 }
 
+// Checks for logged in user in system. DRY code
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+
+	return func(s *state, cmd command) error {
+		currentUser, userErr := s.db.GetUser(context.Background(), s.config.CURRENT_USER_NAME)
+		if userErr != nil {
+			return fmt.Errorf("error getting current user: %v", userErr)
+		}
+
+		return handler(s, cmd, currentUser)
+	}
+}
+
 // Register new handler function for command name
 func (c *commands) register(name string, f func(*state, command) error) {
 	c.handableCommands[name] = f
@@ -76,19 +89,12 @@ func handleAgg(s *state, cmd command) error {
 
 }
 
-
-
-func handleFollow(s *state, cmd command) error {
+func handleFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) == 0 {
 		return fmt.Errorf("follow command expects one argument of url")
 	}
 
 	feedUrl := cmd.args[0]
-
-	currentUser, userErr := s.db.GetUser(context.Background(), s.config.CURRENT_USER_NAME)
-	if userErr != nil {
-		return fmt.Errorf("error getting user from db to add feed with name %s: %v", cmd.args[0], userErr)
-	}
 
 	feed, feedErr := s.db.GetFeedByUrl(context.Background(), feedUrl)
 	if feedErr != nil {
@@ -99,7 +105,7 @@ func handleFollow(s *state, cmd command) error {
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		UserID:    currentUser.ID,
+		UserID:    user.ID,
 		FeedID:    feed.ID,
 	})
 
@@ -115,19 +121,33 @@ func handleFollow(s *state, cmd command) error {
 
 }
 
-func handleFollowing(s *state, cmd command) error {
+func handleUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) == 0 {
+		return fmt.Errorf("unfollow command expects one argument of url")
+	}
+	feedUrl := cmd.args[0]
 
-	currentUser, userErr := s.db.GetUser(context.Background(), s.config.CURRENT_USER_NAME)
-	if userErr != nil {
-		return fmt.Errorf("error getting user from db to add feed with name: %v", userErr)
+	delErr := s.db.DeleteFeedsFollow(context.Background(), database.DeleteFeedsFollowParams{
+		Url:    feedUrl,
+		UserID: user.ID,
+	})
+
+	if delErr != nil {
+		return fmt.Errorf("error while handling unfollow by url %s: %v", feedUrl, delErr)
 	}
 
-	feedFollowsForUser, feedFollowsErr := s.db.GetFeedFollowsForUser(context.Background(), currentUser.ID)
+	return nil
+
+}
+
+func handleFollowing(s *state, cmd command, user database.User) error {
+
+	feedFollowsForUser, feedFollowsErr := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if feedFollowsErr != nil {
-		return fmt.Errorf("error getting feed follow for user %s: %v", s.config.CURRENT_USER_NAME, userErr)
+		return fmt.Errorf("error getting feed follow for user %s: %v", user.Name, feedFollowsErr)
 	}
 
-	fmt.Printf("Feeds that user %s follows:\n", currentUser.Name)
+	fmt.Printf("Feeds that user %s follows:\n", user.Name)
 	fmt.Printf("-----------------------------------\n")
 	for i := range feedFollowsForUser {
 		fmt.Printf("Name: %v \n", feedFollowsForUser[i].FeedName)
