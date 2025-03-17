@@ -45,6 +45,8 @@ func main() {
 	cliCommands.register("agg", handleAgg)
 	cliCommands.register("addfeed", handleAddFeed)
 	cliCommands.register("feeds", handleFeeds)
+	cliCommands.register("follow", handleFollow)
+	cliCommands.register("following", handleFollowing)
 
 	providedCommands := os.Args
 	if len(providedCommands) < 2 {
