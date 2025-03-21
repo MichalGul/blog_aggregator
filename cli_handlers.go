@@ -8,10 +8,8 @@ import (
 	"io"
 	"net/http"
 	"time"
-
 	"github.com/MichalGul/blog_aggregator/internal/config"
 	"github.com/MichalGul/blog_aggregator/internal/database"
-	"github.com/google/uuid"
 )
 
 type state struct {
@@ -74,85 +72,52 @@ func handleReset(s *state, cmd command) error {
 }
 
 func handleAgg(s *state, cmd command) error {
-	var feedStr string = "https://www.wagslane.dev/index.xml"
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// time_between_reqs interval feed 1s 1m 1h
+	// var feedStr string = "https://www.wagslane.dev/index.xml"
+	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// defer cancel()
 
-	rssFeed, err := fetchFeed(ctx, feedStr)
+	if (len(cmd.args) < 1 || len(cmd.args) >2 ) {
+		return fmt.Errorf("agg command expects one argument of time aggregation interval: %v <timme_between_reqs>", cmd.name)
+	}
+
+	time_between_reqs := cmd.args[0]
+	parsedTime, _ := time.ParseDuration(time_between_reqs)
+
+	fmt.Printf("Collecting feeds every: %s \n", parsedTime)
+
+	
+	ticker := time.NewTicker(parsedTime)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
+
+}
+
+func scrapeFeeds(s *state) error {
+
+	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
 	if err != nil {
-		return fmt.Errorf("error fetching RSS feed at %s, err: %v", feedStr, err)
+		return fmt.Errorf("error getting next feed to fetch: %v", err)
 	}
 
-	fmt.Printf("%+v\n", rssFeed)
-
-	return nil
-
-}
-
-func handleFollow(s *state, cmd command, user database.User) error {
-	if len(cmd.args) == 0 {
-		return fmt.Errorf("follow command expects one argument of url")
+	nextFeed, markErr := s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
+	if markErr != nil {
+		return fmt.Errorf("error marking feed as fetched %s: %v", nextFeed.Name, markErr)
 	}
 
-	feedUrl := cmd.args[0]
-
-	feed, feedErr := s.db.GetFeedByUrl(context.Background(), feedUrl)
+	rssFeed, feedErr := fetchFeed(context.Background(), nextFeed.Url)
 	if feedErr != nil {
-		return fmt.Errorf("error getting feed from db by url %s: %v", feedUrl, feedErr)
+		return fmt.Errorf("error fetching feed %s: %v", nextFeed.Url, feedErr)
 	}
 
-	createdFeedFollow, createError := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
-		ID:        uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		UserID:    user.ID,
-		FeedID:    feed.ID,
-	})
+	fmt.Printf("Aggregated items in Feed:")
+	fmt.Printf("------------------------------------------------------\n")
 
-	if createError != nil {
-		return fmt.Errorf("error adding feed follow: %s to database: %v", feedUrl, createError)
+	for i := range rssFeed.Channel.Item {
+		fmt.Printf("Name: %s \n", rssFeed.Channel.Item[i].Title)
 	}
 
-	fmt.Printf("Feed Follow was successfuly created \n")
-	fmt.Printf("FeedFollow Name: %v \n", createdFeedFollow.FeedName)
-	fmt.Printf("FeedFollow User id: %v \n", createdFeedFollow.UserName)
-
-	return nil
-
-}
-
-func handleUnfollow(s *state, cmd command, user database.User) error {
-	if len(cmd.args) == 0 {
-		return fmt.Errorf("unfollow command expects one argument of url")
-	}
-	feedUrl := cmd.args[0]
-
-	delErr := s.db.DeleteFeedsFollow(context.Background(), database.DeleteFeedsFollowParams{
-		Url:    feedUrl,
-		UserID: user.ID,
-	})
-
-	if delErr != nil {
-		return fmt.Errorf("error while handling unfollow by url %s: %v", feedUrl, delErr)
-	}
-
-	return nil
-
-}
-
-func handleFollowing(s *state, cmd command, user database.User) error {
-
-	feedFollowsForUser, feedFollowsErr := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
-	if feedFollowsErr != nil {
-		return fmt.Errorf("error getting feed follow for user %s: %v", user.Name, feedFollowsErr)
-	}
-
-	fmt.Printf("Feeds that user %s follows:\n", user.Name)
-	fmt.Printf("-----------------------------------\n")
-	for i := range feedFollowsForUser {
-		fmt.Printf("Name: %v \n", feedFollowsForUser[i].FeedName)
-	}
-	fmt.Printf("-----------------------------------\n")
 	return nil
 }
 
