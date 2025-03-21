@@ -48,6 +48,9 @@ func main() {
 	cliCommands.register("follow", middlewareLoggedIn(handleFollow))
 	cliCommands.register("following", middlewareLoggedIn(handleFollowing))
 	cliCommands.register("unfollow", middlewareLoggedIn(handleUnfollow))
+	cliCommands.register("browse", middlewareLoggedIn(handleBrowse))
+
+	
 
 
 	providedCommands := os.Args

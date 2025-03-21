@@ -65,3 +65,5 @@ WITH selected_feed_id as (
 -- name: GetNextFeedToFetch :one
 SELECT * FROM feeds ORDER BY last_fetched_at ASC NULLS FIRST LIMIT 1;
 
+-- name: GetFeedById :one
+SELECT * FROM feeds WHERE feeds.id = $1;
